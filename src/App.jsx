@@ -19,7 +19,14 @@ const PHOTOS = [
 
 const BACHELOR_NAME = "WADER";
 const PLAYERS = ['Wade','Ger','Lance','Regs','Ivo','Arny','Andy','Turner','Scotty B','Gibby','Patty','Jimmer'];
-const EVENT_NAMES = ['Beer Pong','Flip Cup','Cornhole','Kings Cup','Rage Cage'];
+const EVENT_NAMES = ['Beer Pong','Flip Cup','Cornhole','Beer Ball','Rage Cage'];
+const EVENT_INFO = {
+  'Beer Pong': { emoji: '🏓', desc: 'Sink ping pong balls into your opponents\' cups from across the table. Each team sets up 6 or 10 cups in a triangle. Take turns shooting — sink a ball, they drink. Last team with cups standing wins.' },
+  'Flip Cup': { emoji: '🍻', desc: 'Two teams line up on opposite sides of a table. Chug your beer, then flip the empty cup upside down by flicking the rim off the edge. Next player goes once the cup lands. First team to flip all cups wins.' },
+  'Cornhole': { emoji: '🎯', desc: 'Toss bean bags at a raised board with a hole from 27 feet away. Bag on the board = 1 point, bag through the hole = 3 points. Play to 21, must win by 2. Points cancel out each round.' },
+  'Beer Ball': { emoji: '🍺', desc: 'Two teams of 2, each player has an unopened beer on the table. Take turns throwing a ping pong ball at the other team\'s cans. Hit one? Start chugging your beer until they retrieve the ball and slam it on the table. First team to finish all their beers wins.' },
+  'Rage Cage': { emoji: '😤', desc: 'Players circle a table of filled cups. Two players start with a ball each — bounce it into an empty cup. Make it? Pass cup and ball to the left. If you make it before the person to your right, stack your cup on theirs and they drink a new cup from the middle. Game ends when all cups are gone.' },
+};
 const TEAM_COLORS = ['#E53E3E','#3182CE','#38A169','#D69E2E','#9F7AEA','#DD6B20'];
 const PTS      = { 1:6, 2:5, 3:4, 4:3, 5:1.5 };
 const MEDALS   = { 1:'🥇', 2:'🥈', 3:'🥉', 4:'4th', 5:'T‑5th' };
@@ -418,6 +425,60 @@ export default function App() {
     lnk.href = 'https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=DM+Sans:wght@400;500;600;700&display=swap';
     lnk.rel = 'stylesheet';
     document.head.appendChild(lnk);
+
+    // PWA — make installable as home screen app
+    document.title = "Gordo's Last Go";
+
+    const setMeta = (name, content, attr = 'name') => {
+      let m = document.querySelector(`meta[${attr}="${name}"]`);
+      if (!m) { m = document.createElement('meta'); m.setAttribute(attr, name); document.head.appendChild(m); }
+      m.setAttribute('content', content);
+    };
+
+    setMeta('apple-mobile-web-app-capable', 'yes');
+    setMeta('apple-mobile-web-app-status-bar-style', 'black-translucent');
+    setMeta('apple-mobile-web-app-title', "Gordo's Last Go");
+    setMeta('mobile-web-app-capable', 'yes');
+    setMeta('theme-color', '#F76900');
+    setMeta('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
+
+    // Generate a 180x180 orange beer emoji icon as canvas data URL
+    const makeIcon = (size) => {
+      const c = document.createElement('canvas');
+      c.width = size; c.height = size;
+      const ctx = c.getContext('2d');
+      // Orange circle background
+      ctx.fillStyle = '#F76900';
+      ctx.beginPath(); ctx.arc(size/2, size/2, size/2, 0, Math.PI*2); ctx.fill();
+      // Beer emoji
+      ctx.font = `${size * 0.55}px serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('🍺', size/2, size/2 + size*0.03);
+      return c.toDataURL('image/png');
+    };
+
+    const iconUrl = makeIcon(180);
+    const addIcon = (rel, sizes) => {
+      let link = document.querySelector(`link[rel="${rel}"]${sizes ? `[sizes="${sizes}"]` : ''}`);
+      if (!link) { link = document.createElement('link'); link.rel = rel; if (sizes) link.setAttribute('sizes', sizes); document.head.appendChild(link); }
+      link.href = iconUrl;
+    };
+    addIcon('apple-touch-icon', '180x180');
+    addIcon('icon', '192x192');
+
+    // Web app manifest via data URL
+    const manifest = {
+      name: "Gordo's Last Go — Beer Olympics",
+      short_name: "Gordo's Last Go",
+      start_url: window.location.href,
+      display: 'standalone',
+      background_color: '#0A0A0A',
+      theme_color: '#F76900',
+      icons: [{ src: iconUrl, sizes: '192x192', type: 'image/png' }],
+    };
+    let manifestLink = document.querySelector('link[rel="manifest"]');
+    if (!manifestLink) { manifestLink = document.createElement('link'); manifestLink.rel = 'manifest'; document.head.appendChild(manifestLink); }
+    manifestLink.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(manifest));
   }, []);
 
   useEffect(() => {
@@ -636,10 +697,20 @@ export default function App() {
         {activeEvent && (
           <div>
             <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:4 }}>
+              <span style={{ fontSize:28 }}>{EVENT_INFO[activeEvent.name]?.emoji}</span>
               <div style={{ ...FD, fontSize:28, fontWeight:900, color:'#fff' }}>{activeEvent.name}</div>
               {activeEvent.bracket?.R3M2?.w&&<span style={{ background:'#0F2A0F', border:'1px solid #4CAF5055', color:'#4CAF50', fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:12, letterSpacing:.5 }}>COMPLETE ✓</span>}
             </div>
-            <p style={{ fontSize:12.5, color:'#4A4A4A', marginTop:2, marginBottom:20 }}>Tap a team to record a game win. First to 2 wins the match. ↩ resets a match.</p>
+
+            {/* How to play card */}
+            <div style={{ padding:'14px 16px', marginTop:8, marginBottom:20, background:`${SYR}0A`, border:`1px solid ${SYR}22`, borderRadius:12 }}>
+              <div style={{ fontSize:11, fontWeight:800, color:SYR, letterSpacing:1, textTransform:'uppercase', marginBottom:6 }}>How to Play</div>
+              <div style={{ fontSize:13, color:'#999', lineHeight:1.5 }}>{EVENT_INFO[activeEvent.name]?.desc}</div>
+              <div style={{ marginTop:10, paddingTop:10, borderTop:`1px solid ${BORDER}`, fontSize:11.5, color:'#555' }}>
+                🏆 Tap a team to record a game win · First to 2 wins the match · ↩ resets a match
+              </div>
+            </div>
+
             <BracketView bracket={activeEvent.bracket} teams={teams} onGameWin={(mid,wid)=>handleGameWin(activeEvent.id,mid,wid)} onResetMatch={(mid)=>handleResetMatch(activeEvent.id,mid)} />
             {(()=>{
               const pl=getPlacements(activeEvent.bracket);
