@@ -33,6 +33,9 @@ const CARD   = '#171717';
 const CARD2  = '#1F1F1F';
 const BORDER = '#2A2A2A';
 
+// ═══════════════════════════════════════════════════════════════════
+//  STORAGE
+// ═══════════════════════════════════════════════════════════════════
 // Storage handled by ./supabase.js
 
 // ═══════════════════════════════════════════════════════════════════
@@ -426,14 +429,6 @@ export default function App() {
     });
   }, []);
 
-  // Realtime sync — other devices see changes instantly
-  useEffect(() => {
-    const unsub = subscribeToChanges((newState) => {
-      setGs(newState);
-    });
-    return unsub;
-  }, []);
-
   const update = (fn) => {
     setGs(prev => {
       const next = typeof fn === 'function' ? fn(prev) : fn;
@@ -528,10 +523,19 @@ export default function App() {
       </div>
 
       {/* TABS */}
-      <div style={{ display:'flex', overflowX:'auto', background:'#111', borderBottom:`1px solid ${BORDER}`, scrollbarWidth:'none' }}>
+      <div style={{ display:'flex', overflowX:'auto', background:'#111', borderBottom:`1px solid ${BORDER}`, scrollbarWidth:'none', padding:'6px 8px 0', gap:4 }}>
         {tabs.map(t=>(
-          <button key={t.id} onClick={()=>setTab(t.id)} style={{ ...F, padding:'11px 18px', border:'none', background:'transparent', borderBottom:`2px solid ${tab===t.id?SYR:'transparent'}`, color:tab===t.id?SYR:t.done?'#4CAF50':'#666', cursor:'pointer', fontWeight:tab===t.id?700:500, fontSize:13, whiteSpace:'nowrap', transition:'all .15s', marginBottom:-1, flexShrink:0 }}>
-            <span style={{ marginRight:5, fontSize:11 }}>{t.icon}</span>{t.label}
+          <button key={t.id} onClick={()=>setTab(t.id)} style={{
+            ...F, padding:'14px 16px 12px', border:'none', borderRadius:'10px 10px 0 0',
+            background: tab===t.id ? `${SYR}20` : 'transparent',
+            borderBottom: `3px solid ${tab===t.id ? SYR : 'transparent'}`,
+            color: tab===t.id ? SYR : t.done ? '#4CAF50' : '#666',
+            cursor:'pointer', fontWeight: tab===t.id ? 700 : 600,
+            fontSize:14, whiteSpace:'nowrap', transition:'all .15s',
+            flexShrink:0, minWidth:48, WebkitTapHighlightColor:'transparent',
+          }}>
+            <div style={{ fontSize:16, marginBottom:2 }}>{t.icon}</div>
+            <div style={{ fontSize:11, letterSpacing:.3 }}>{t.label}</div>
           </button>
         ))}
       </div>
@@ -542,48 +546,87 @@ export default function App() {
         {/* SETUP */}
         {tab==='setup' && (
           <div>
-            <div style={{ marginBottom:20 }}>
-              <div style={{ ...FD, fontSize:28, fontWeight:900, color:'#fff', lineHeight:1 }}>Team Setup</div>
-              <div style={{ fontSize:13, color:'#666', marginTop:4 }}>
-                {phase==='tournament'?'Tournament is live — reset to change teams.':'Select two players to pair them into a team.'}
+            <div style={{ marginBottom:24 }}>
+              <div style={{ ...FD, fontSize:34, fontWeight:900, lineHeight:1, background:`linear-gradient(135deg, #fff, ${SYR_LT})`, WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>Team Setup</div>
+              <div style={{ fontSize:14, color:'#777', marginTop:6 }}>
+                {phase==='tournament'?'Tournament is live — reset to change teams.':'Tap two players to pair them into a team.'}
               </div>
             </div>
             {phase!=='tournament' && (
               <>
-                {selP && <div style={{ padding:'10px 16px', marginBottom:16, background:`${SYR}18`, border:`1px solid ${SYR}55`, borderRadius:8, color:SYR, fontSize:13, fontWeight:500 }}>✦ <strong>{selP}</strong> selected — tap another player to form a team</div>}
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(110px,1fr))', gap:8, marginBottom:28 }}>
+                {selP && <div style={{ padding:'14px 18px', marginBottom:18, background:`linear-gradient(135deg, ${SYR}22, ${SYR}10)`, border:`2px solid ${SYR}66`, borderRadius:12, color:SYR, fontSize:15, fontWeight:600, display:'flex', alignItems:'center', gap:8 }}>
+                  <div style={{ width:10, height:10, borderRadius:'50%', background:SYR, animation:'pulse 1s infinite', flexShrink:0 }} />
+                  <span><strong>{selP}</strong> selected — tap another player to form a team</span>
+                </div>}
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px,1fr))', gap:10, marginBottom:28 }}>
                   {PLAYERS.map(p => {
                     const taken=assigned.includes(p), isSel=selP===p, myTeam=teams.find(t=>t.player1===p||t.player2===p);
                     return (
-                      <button key={p} onClick={()=>handlePlayerClick(p)} disabled={taken} style={{ ...F, padding:'13px 6px', borderRadius:9, border:`2px solid ${isSel?SYR:taken?'#1E1E1E':BORDER}`, background:isSel?`${SYR}28`:taken?'#131313':CARD, color:taken?'#333':isSel?SYR:'#ddd', cursor:taken?'not-allowed':'pointer', fontWeight:600, fontSize:13.5, transition:'all .15s', position:'relative' }}>
+                      <button key={p} onClick={()=>handlePlayerClick(p)} disabled={taken} style={{
+                        ...F, padding:'18px 10px', borderRadius:12,
+                        border: `2px solid ${isSel ? SYR : taken ? TEAM_COLORS[myTeam?.colorIdx]+'55' : BORDER}`,
+                        background: isSel ? `linear-gradient(135deg, ${SYR}35, ${SYR}18)` : taken ? `${TEAM_COLORS[myTeam?.colorIdx]}12` : CARD,
+                        color: taken ? '#555' : isSel ? '#fff' : '#ddd',
+                        cursor: taken ? 'not-allowed' : 'pointer',
+                        fontWeight:700, fontSize:15, transition:'all .15s', position:'relative',
+                        boxShadow: isSel ? `0 0 20px ${SYR}44` : 'none',
+                        WebkitTapHighlightColor:'transparent', minHeight:56,
+                      }}>
                         {p}
-                        {taken&&myTeam&&<div style={{ width:7,height:7,borderRadius:'50%',background:TEAM_COLORS[myTeam.colorIdx],position:'absolute',top:5,right:5 }}/>}
-                        {isSel&&<div style={{ fontSize:8.5,color:SYR,marginTop:3,letterSpacing:.5,fontWeight:700 }}>SELECTED</div>}
+                        {taken && myTeam && <div style={{ width:10, height:10, borderRadius:'50%', background:TEAM_COLORS[myTeam.colorIdx], position:'absolute', top:7, right:7, boxShadow:`0 0 6px ${TEAM_COLORS[myTeam.colorIdx]}88` }} />}
+                        {isSel && <div style={{ fontSize:9, color:SYR, marginTop:4, letterSpacing:1, fontWeight:800 }}>SELECTED</div>}
+                        {taken && <div style={{ fontSize:9, color:'#444', marginTop:4, letterSpacing:.5, fontWeight:600 }}>PAIRED</div>}
                       </button>
                     );
                   })}
                 </div>
               </>
             )}
-            <div style={{ marginBottom:10, fontSize:13, fontWeight:600, color:'#666' }}>Teams: <span style={{ color:SYR, fontWeight:800 }}>{teams.length}</span> / 6</div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px,1fr))', gap:10, marginBottom:28 }}>
+
+            {/* Progress bar */}
+            <div style={{ marginBottom:8 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                <span style={{ fontSize:14, fontWeight:700, color:'#888' }}>Teams Formed</span>
+                <span style={{ ...FD, fontSize:28, fontWeight:900, color:SYR }}>{teams.length}<span style={{ color:'#444', fontSize:18 }}>/6</span></span>
+              </div>
+              <div style={{ height:6, background:'#1A1A1A', borderRadius:3, overflow:'hidden' }}>
+                <div style={{ height:'100%', width:`${(teams.length/6)*100}%`, background:`linear-gradient(90deg, ${SYR_DK}, ${SYR}, ${SYR_LT})`, borderRadius:3, transition:'width .3s', boxShadow: teams.length > 0 ? `0 0 10px ${SYR}66` : 'none' }} />
+              </div>
+            </div>
+
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px,1fr))', gap:10, marginBottom:28, marginTop:16 }}>
               {teams.map((t,i)=>(
-                <div key={t.id} style={{ padding:'13px 15px', borderRadius:10, border:`2px solid ${TEAM_COLORS[t.colorIdx]}50`, background:`${TEAM_COLORS[t.colorIdx]}14`, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <div key={t.id} style={{
+                  padding:'16px 18px', borderRadius:14,
+                  border:`2px solid ${TEAM_COLORS[t.colorIdx]}66`,
+                  background:`linear-gradient(135deg, ${TEAM_COLORS[t.colorIdx]}18, ${TEAM_COLORS[t.colorIdx]}08)`,
+                  display:'flex', alignItems:'center', justifyContent:'space-between',
+                  boxShadow:`0 4px 16px ${TEAM_COLORS[t.colorIdx]}15`,
+                }}>
                   <div>
-                    <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:5 }}><Dot ci={t.colorIdx} sz={10}/><span style={{ fontSize:11, fontWeight:700, color:'#777', letterSpacing:.5, textTransform:'uppercase' }}>Team {i+1}</span></div>
-                    <div style={{ fontSize:14.5, fontWeight:700, color:'#fff' }}>{t.player1} & {t.player2}</div>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                      <Dot ci={t.colorIdx} sz={12}/>
+                      <span style={{ fontSize:12, fontWeight:800, color:TEAM_COLORS[t.colorIdx], letterSpacing:.5, textTransform:'uppercase' }}>Team {i+1}</span>
+                    </div>
+                    <div style={{ fontSize:16, fontWeight:700, color:'#fff' }}>{t.player1} & {t.player2}</div>
                   </div>
-                  {phase!=='tournament'&&<button onClick={()=>removeTeam(t.id)} style={{ background:'none',border:'none',color:'#3A3A3A',cursor:'pointer',fontSize:16,padding:4 }}>✕</button>}
+                  {phase!=='tournament'&&<button onClick={()=>removeTeam(t.id)} style={{ background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', color:'#555', cursor:'pointer', fontSize:14, padding:'6px 10px', borderRadius:8, WebkitTapHighlightColor:'transparent' }}>✕</button>}
                 </div>
               ))}
               {phase!=='tournament'&&Array.from({length:6-teams.length}).map((_,i)=>(
-                <div key={`ph${i}`} style={{ padding:'13px 15px', borderRadius:10, border:`2px dashed ${BORDER}`, display:'flex', alignItems:'center', justifyContent:'center', color:'#272727', fontSize:13, fontStyle:'italic' }}>Team {teams.length+i+1}</div>
+                <div key={`ph${i}`} style={{ padding:'16px 18px', borderRadius:14, border:`2px dashed #222`, display:'flex', alignItems:'center', justifyContent:'center', color:'#222', fontSize:14, fontWeight:600 }}>Team {teams.length+i+1}</div>
               ))}
             </div>
             {teams.length===6&&phase!=='tournament'&&(
-              <div style={{ textAlign:'center', marginTop:4 }}>
-                <button onClick={startTournament} style={{ ...F, background:`linear-gradient(135deg,${SYR_DK},${SYR})`, border:'none', color:'#fff', padding:'15px 48px', borderRadius:10, cursor:'pointer', fontSize:16, fontWeight:800, letterSpacing:.5, boxShadow:`0 4px 24px ${SYR}55` }}>🍺 START BEER OLYMPICS!</button>
-                <div style={{ marginTop:8, fontSize:12, color:'#444' }}>Byes are randomly assigned — different every event</div>
+              <div style={{ textAlign:'center', marginTop:8 }}>
+                <button onClick={startTournament} style={{
+                  ...F, background:`linear-gradient(135deg,${SYR_DK},${SYR},${SYR_LT})`,
+                  border:'2px solid rgba(255,255,255,.15)', color:'#fff', padding:'18px 52px', borderRadius:14,
+                  cursor:'pointer', fontSize:18, fontWeight:800, letterSpacing:1, textTransform:'uppercase',
+                  boxShadow:`0 8px 32px ${SYR}66, 0 0 60px ${SYR}22`,
+                  WebkitTapHighlightColor:'transparent',
+                }}>🍻 START BEER OLYMPICS!</button>
+                <div style={{ marginTop:10, fontSize:12, color:'#444' }}>Byes are randomly assigned — different every event</div>
               </div>
             )}
           </div>
