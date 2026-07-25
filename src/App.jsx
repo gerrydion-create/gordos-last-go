@@ -139,9 +139,40 @@ const freshState = () => ({
 // ═══════════════════════════════════════════════════════════════════
 //  WELCOME DASHBOARD
 // ═══════════════════════════════════════════════════════════════════
+function BeerMug({ size = 80 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Mug body */}
+      <rect x="18" y="28" width="50" height="58" rx="6" fill="url(#mugGrad)" stroke="#D05A00" strokeWidth="2.5"/>
+      {/* Glass shine */}
+      <rect x="24" y="34" width="12" height="40" rx="4" fill="rgba(255,255,255,.15)"/>
+      {/* Beer liquid */}
+      <rect x="21" y="38" width="44" height="44" rx="4" fill="#F5A623" opacity=".85"/>
+      {/* Foam */}
+      <ellipse cx="43" cy="36" rx="24" ry="7" fill="#FFF5E0"/>
+      <ellipse cx="33" cy="33" rx="8" ry="5" fill="#FFF8EC"/>
+      <ellipse cx="50" cy="34" rx="7" ry="4.5" fill="#FFF8EC"/>
+      <ellipse cx="43" cy="30" rx="5" ry="3.5" fill="#FFFDF7"/>
+      {/* Handle */}
+      <path d="M68 40 C82 40, 86 52, 86 60 C86 68, 82 78, 68 78" stroke="#D05A00" strokeWidth="5" fill="none" strokeLinecap="round"/>
+      <path d="M68 40 C80 40, 84 52, 84 60 C84 68, 80 78, 68 78" stroke={SYR} strokeWidth="3" fill="none" strokeLinecap="round"/>
+      {/* Bubbles */}
+      <circle cx="35" cy="60" r="2" fill="rgba(255,255,255,.3)"/>
+      <circle cx="45" cy="68" r="1.5" fill="rgba(255,255,255,.25)"/>
+      <circle cx="50" cy="52" r="2.5" fill="rgba(255,255,255,.2)"/>
+      <circle cx="30" cy="72" r="1.8" fill="rgba(255,255,255,.2)"/>
+      <defs>
+        <linearGradient id="mugGrad" x1="18" y1="28" x2="68" y2="86" gradientUnits="userSpaceOnUse">
+          <stop stopColor={SYR_LT}/>
+          <stop offset="1" stopColor={SYR_DK}/>
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
+
 function WelcomeDashboard({ onStart }) {
   const [active, setActive] = useState(0);
-  const [flipped, setFlipped] = useState({});
 
   useEffect(() => {
     const t = setInterval(() => setActive(a => (a + 1) % PHOTOS.length), 3500);
@@ -154,36 +185,40 @@ function WelcomeDashboard({ onStart }) {
   return (
     <div style={{ minHeight: '100vh', background: BG, overflow: 'hidden', position: 'relative', ...F }}>
 
-      {/* ── fire/glow background blobs ── */}
+      {/* ── orange glow background ── */}
       <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', width: 500, height: 500, borderRadius: '50%', background: `radial-gradient(circle, ${SYR}18 0%, transparent 70%)`, top: -100, left: -100 }} />
-        <div style={{ position: 'absolute', width: 400, height: 400, borderRadius: '50%', background: `radial-gradient(circle, ${SYR}12 0%, transparent 70%)`, bottom: -50, right: -50 }} />
+        <div style={{ position: 'absolute', width: 600, height: 600, borderRadius: '50%', background: `radial-gradient(circle, ${SYR}22 0%, transparent 65%)`, top: -200, left: '50%', transform: 'translateX(-50%)' }} />
+        <div style={{ position: 'absolute', width: 400, height: 400, borderRadius: '50%', background: `radial-gradient(circle, ${SYR}10 0%, transparent 70%)`, bottom: -100, right: -50 }} />
       </div>
 
       <div style={{ position: 'relative', zIndex: 1, padding: '32px 20px 40px', maxWidth: 860, margin: '0 auto' }}>
 
         {/* ── HERO ── */}
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
-          <div style={{ fontSize: 48, marginBottom: 8 }}>🍺</div>
-          <div style={{ ...FD, fontSize: 58, fontWeight: 900, lineHeight: .92, letterSpacing: -1, color: '#fff' }}>
+          <BeerMug size={90} />
+          <div style={{ ...FD, fontSize: 64, fontWeight: 900, lineHeight: .88, letterSpacing: -2, color: SYR, textShadow: `0 0 40px ${SYR}55`, marginTop: 8 }}>
             GORDO'S
           </div>
-          <div style={{ ...FD, fontSize: 58, fontWeight: 900, lineHeight: .92, letterSpacing: -1, background: 'linear-gradient(135deg, ' + SYR_DK + ', ' + SYR_LT + ')', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          <div style={{ ...FD, fontSize: 64, fontWeight: 900, lineHeight: .88, letterSpacing: -2, color: '#fff', textShadow: '0 2px 20px rgba(0,0,0,.5)' }}>
             LAST GO
           </div>
-          <div style={{ marginTop: 14, display: 'inline-block', padding: '6px 20px', borderRadius: 100, border: '1px solid ' + SYR + '55', background: SYR + '15' }}>
-            <span style={{ color: '#888', fontSize: 13, letterSpacing: 2, textTransform: 'uppercase', fontWeight: 600 }}>🍺 Beer Olympics · Bachelor Party</span>
+
+          <div style={{ marginTop: 18, display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 24px', borderRadius: 100, border: `2px solid ${SYR}44`, background: `${SYR}12` }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: SYR }} />
+            <span style={{ color: SYR_LT, fontSize: 12, letterSpacing: 3, textTransform: 'uppercase', fontWeight: 700 }}>Beer Olympics</span>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: SYR }} />
           </div>
-          <div style={{ marginTop: 18 }}>
-            <div style={{ ...FD, fontSize: 22, fontWeight: 700, color: '#666', letterSpacing: 3, textTransform: 'uppercase' }}>Celebrating</div>
-            <div style={{ ...FD, fontSize: 58, fontWeight: 900, lineHeight: 1, color: '#fff', letterSpacing: -1, marginTop: 2 }}>{BACHELOR_NAME}</div>
-            <div style={{ fontSize: 14, color: '#555', marginTop: 4 }}>Last ride before the ball and chain ⛓️</div>
+
+          <div style={{ marginTop: 22 }}>
+            <div style={{ ...FD, fontSize: 20, fontWeight: 700, color: '#555', letterSpacing: 4, textTransform: 'uppercase' }}>Celebrating</div>
+            <div style={{ ...FD, fontSize: 62, fontWeight: 900, lineHeight: 1, letterSpacing: -1, marginTop: 4, background: `linear-gradient(180deg, #fff 30%, ${SYR_LT})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{BACHELOR_NAME}</div>
+            <div style={{ fontSize: 14, color: '#555', marginTop: 6 }}>Last ride before the ball and chain ⛓️</div>
           </div>
         </div>
 
         {/* ── PHOTO WALL ── */}
         <div style={{ marginBottom: 36 }}>
-          <div style={{ ...FD, fontSize: 18, fontWeight: 700, color: '#555', letterSpacing: 2, textTransform: 'uppercase', textAlign: 'center', marginBottom: 20 }}>
+          <div style={{ ...FD, fontSize: 18, fontWeight: 700, color: SYR, letterSpacing: 2, textTransform: 'uppercase', textAlign: 'center', marginBottom: 20, opacity: .7 }}>
             The Man, The Myth, The Legend
           </div>
 
@@ -196,7 +231,7 @@ function WelcomeDashboard({ onStart }) {
               padding: 10, paddingBottom: 44,
               transform: `rotate(${PHOTOS[active].rot}deg)`,
               transition: 'transform .5s ease',
-              border: `1px solid #333`,
+              border: `1px solid ${SYR}33`,
             }}>
               <img src={PHOTOS[active].src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', borderRadius: 2 }} />
               <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '8px 10px', textAlign: 'center' }}>
@@ -233,12 +268,12 @@ function WelcomeDashboard({ onStart }) {
           {[
             { label: 'Players', val: '12', icon: '👥' },
             { label: 'Events', val: '5', icon: '🏅' },
-            { label: 'Best of', val: '3', icon: '🍺' },
+            { label: 'Best of', val: '3', icon: '🍻' },
           ].map(({ label, val, icon }) => (
-            <div key={label} style={{ background: CARD, borderRadius: 10, padding: '16px 10px', textAlign: 'center', border: `1px solid ${BORDER}` }}>
+            <div key={label} style={{ background: `${SYR}0A`, borderRadius: 12, padding: '16px 10px', textAlign: 'center', border: `1px solid ${SYR}22` }}>
               <div style={{ fontSize: 22 }}>{icon}</div>
-              <div style={{ ...FD, fontSize: 30, fontWeight: 900, color: SYR, lineHeight: 1, marginTop: 4 }}>{val}</div>
-              <div style={{ fontSize: 11, color: '#666', fontWeight: 600, letterSpacing: .5, marginTop: 2, textTransform: 'uppercase' }}>{label}</div>
+              <div style={{ ...FD, fontSize: 32, fontWeight: 900, color: SYR, lineHeight: 1, marginTop: 4 }}>{val}</div>
+              <div style={{ fontSize: 11, color: SYR_LT, fontWeight: 600, letterSpacing: .5, marginTop: 2, textTransform: 'uppercase', opacity: .6 }}>{label}</div>
             </div>
           ))}
         </div>
@@ -248,16 +283,16 @@ function WelcomeDashboard({ onStart }) {
           <button
             onClick={onStart}
             style={{
-              ...F, background: `linear-gradient(135deg, ${SYR_DK}, ${SYR})`,
-              border: 'none', color: '#fff', padding: '16px 52px',
-              borderRadius: 12, cursor: 'pointer', fontSize: 18,
-              fontWeight: 800, letterSpacing: .5,
-              boxShadow: `0 6px 28px ${SYR}66`,
+              ...F, background: `linear-gradient(135deg, ${SYR_DK}, ${SYR}, ${SYR_LT})`,
+              border: '2px solid rgba(255,255,255,.15)', color: '#fff', padding: '18px 56px',
+              borderRadius: 14, cursor: 'pointer', fontSize: 18,
+              fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase',
+              boxShadow: `0 8px 32px ${SYR}66, 0 0 60px ${SYR}22`,
             }}
           >
-            🍺 LET'S GET IT STARTED
+            🍻 LET'S GET IT STARTED
           </button>
-          <div style={{ marginTop: 10, fontSize: 12, color: '#3A3A3A' }}>Set up teams and kick off the tournament</div>
+          <div style={{ marginTop: 12, fontSize: 12, color: '#444' }}>Set up teams and kick off the tournament</div>
         </div>
       </div>
     </div>
