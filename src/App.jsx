@@ -61,16 +61,15 @@ const shuffled = (arr) => {
 
 // Generate all 5 brackets together so byes are balanced across teams.
 // 5 events x 2 byes = 10 bye slots for 6 teams -> 4 teams get 2 byes, 2 teams get 1 bye.
-const genBalancedBrackets = (ids) => {
+const genBalancedBrackets = (ids, numEvents) => {
   const byeCounts = Object.fromEntries(ids.map(id => [id, 0]));
-  return Array.from({ length: 5 }, () => {
-    // Sort by bye count ascending; break ties randomly
+  return Array.from({ length: numEvents }, () => {
     const sorted = [...ids].sort((a, b) => {
       const diff = byeCounts[a] - byeCounts[b];
       return diff !== 0 ? diff : Math.random() - 0.5;
     });
-    const byeTeams = sorted.slice(0, 2);        // fewest byes -> get the bye
-    const r1Teams  = shuffled(sorted.slice(2)); // remaining 4 randomised into R1
+    const byeTeams = sorted.slice(0, 2);
+    const r1Teams  = shuffled(sorted.slice(2));
     byeTeams.forEach(id => byeCounts[id]++);
     return mkBracket([...byeTeams, ...r1Teams]);
   });
@@ -419,6 +418,8 @@ export default function App() {
   const [loading, setLoading]   = useState(true);
   const [saving, setSaving]     = useState(false);
   const [askReset, setAskReset] = useState(false);
+  const [newEvent, setNewEvent] = useState('');
+  const [showAddEvent, setShowAddEvent] = useState(false);
 
   useEffect(() => {
     const lnk = document.createElement('link');
@@ -543,10 +544,34 @@ export default function App() {
     setSelP(null);
   };
   const removeTeam = (id) => update(prev=>({ ...prev, teams:prev.teams.filter(t=>t.id!==id) }));
+
+  const randomizeTeams = () => {
+    const shuffledPlayers = shuffled([...PLAYERS]);
+    const newTeams = [];
+    for (let i = 0; i < shuffledPlayers.length; i += 2) {
+      newTeams.push({ id:`t${Date.now()}${i}`, player1:shuffledPlayers[i], player2:shuffledPlayers[i+1], colorIdx:i/2 });
+    }
+    update(prev=>({ ...prev, teams:newTeams }));
+    setSelP(null);
+  };
+
+  const addEvent = () => {
+    const name = newEvent.trim();
+    if (!name) return;
+    update(prev=>({ ...prev, events:[...prev.events, { id:Date.now(), name, bracket:null }] }));
+    setNewEvent('');
+    setShowAddEvent(false);
+  };
+
+  const removeEvent = (evId) => {
+    update(prev=>({ ...prev, events:prev.events.filter(ev=>ev.id!==evId) }));
+  };
+
   const startTournament = () => {
     if (teams.length!==6) return;
+    if (events.length===0) return;
     const ids = teams.map(t=>t.id);
-    const brackets = genBalancedBrackets(ids);
+    const brackets = genBalancedBrackets(ids, events.length);
     update(prev=>({ ...prev, phase:'tournament', events:prev.events.map((ev,i)=>({ ...ev, bracket:brackets[i] })) }));
     setTab('e0');
   };
@@ -615,8 +640,24 @@ export default function App() {
             </div>
             {phase!=='tournament' && (
               <>
+                {/* Randomize + Clear */}
+                <div style={{ display:'flex', gap:10, marginBottom:18, flexWrap:'wrap', alignItems:'center' }}>
+                  <button onClick={randomizeTeams} style={{
+                    ...F, background:`${SYR}18`, border:`2px solid ${SYR}44`, color:SYR,
+                    padding:'12px 20px', borderRadius:12, cursor:'pointer', fontSize:14, fontWeight:700,
+                    WebkitTapHighlightColor:'transparent', display:'flex', alignItems:'center', gap:8,
+                  }}>🎲 Randomize Teams</button>
+                  {teams.length > 0 && (
+                    <button onClick={()=>{update(prev=>({...prev, teams:[]}));setSelP(null);}} style={{
+                      ...F, background:'rgba(255,255,255,.04)', border:'1px solid #333', color:'#666',
+                      padding:'12px 16px', borderRadius:12, cursor:'pointer', fontSize:13, fontWeight:600,
+                      WebkitTapHighlightColor:'transparent',
+                    }}>Clear All</button>
+                  )}
+                </div>
+
                 {selP && <div style={{ padding:'14px 18px', marginBottom:18, background:`linear-gradient(135deg, ${SYR}22, ${SYR}10)`, border:`2px solid ${SYR}66`, borderRadius:12, color:SYR, fontSize:15, fontWeight:600, display:'flex', alignItems:'center', gap:8 }}>
-                  <div style={{ width:10, height:10, borderRadius:'50%', background:SYR, animation:'pulse 1s infinite', flexShrink:0 }} />
+                  <div style={{ width:10, height:10, borderRadius:'50%', background:SYR, flexShrink:0 }} />
                   <span><strong>{selP}</strong> selected — tap another player to form a team</span>
                 </div>}
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px,1fr))', gap:10, marginBottom:28 }}>
@@ -679,7 +720,49 @@ export default function App() {
               ))}
             </div>
             {teams.length===6&&phase!=='tournament'&&(
-              <div style={{ textAlign:'center', marginTop:8 }}>
+              <>
+                {/* EVENT EDITOR */}
+                <div style={{ marginBottom:24, marginTop:8 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                    <div style={{ ...FD, fontSize:22, fontWeight:900, color:'#fff' }}>Events ({events.length})</div>
+                    <button onClick={()=>setShowAddEvent(!showAddEvent)} style={{
+                      ...F, background:`${SYR}18`, border:`1px solid ${SYR}44`, color:SYR,
+                      padding:'8px 16px', borderRadius:10, cursor:'pointer', fontSize:13, fontWeight:700,
+                      WebkitTapHighlightColor:'transparent',
+                    }}>{showAddEvent ? '✕ Cancel' : '+ Add Event'}</button>
+                  </div>
+
+                  {showAddEvent && (
+                    <div style={{ display:'flex', gap:8, marginBottom:14 }}>
+                      <input
+                        value={newEvent} onChange={e=>setNewEvent(e.target.value)}
+                        onKeyDown={e=>e.key==='Enter'&&addEvent()}
+                        placeholder="e.g. Dizzy Bat, Quarters..."
+                        style={{ ...F, flex:1, padding:'14px 16px', borderRadius:12, background:CARD, border:`2px solid ${BORDER}`, color:'#fff', fontSize:15, outline:'none' }}
+                      />
+                      <button onClick={addEvent} disabled={!newEvent.trim()} style={{
+                        ...F, background:newEvent.trim()?SYR:'#222', border:'none', color:'#fff',
+                        padding:'14px 20px', borderRadius:12, cursor:newEvent.trim()?'pointer':'not-allowed',
+                        fontSize:14, fontWeight:700, WebkitTapHighlightColor:'transparent',
+                      }}>Add</button>
+                    </div>
+                  )}
+
+                  <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                    {events.map((ev)=>(
+                      <div key={ev.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', background:CARD, borderRadius:10, border:`1px solid ${BORDER}` }}>
+                        <span style={{ fontSize:20 }}>{EVENT_INFO[ev.name]?.emoji || '🎮'}</span>
+                        <span style={{ flex:1, fontWeight:600, fontSize:14, color:'#ddd' }}>{ev.name}</span>
+                        {events.length > 1 && (
+                          <button onClick={()=>removeEvent(ev.id)} style={{ background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.08)', color:'#444', cursor:'pointer', fontSize:12, padding:'5px 10px', borderRadius:8, WebkitTapHighlightColor:'transparent' }}>✕</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ fontSize:11, color:'#444', marginTop:8 }}>Add or remove events before starting. Each gets its own bracket.</div>
+                </div>
+
+                <div style={{ textAlign:'center', marginTop:8 }}>
                 <button onClick={startTournament} style={{
                   ...F, background:`linear-gradient(135deg,${SYR_DK},${SYR},${SYR_LT})`,
                   border:'2px solid rgba(255,255,255,.15)', color:'#fff', padding:'18px 52px', borderRadius:14,
@@ -688,7 +771,8 @@ export default function App() {
                   WebkitTapHighlightColor:'transparent',
                 }}>🍻 START BEER OLYMPICS!</button>
                 <div style={{ marginTop:10, fontSize:12, color:'#444' }}>Byes are randomly assigned — different every event</div>
-              </div>
+                </div>
+              </>
             )}
           </div>
         )}
