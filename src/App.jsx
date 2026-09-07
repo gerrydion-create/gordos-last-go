@@ -413,7 +413,13 @@ export default function App() {
   if (loading) return <div style={{ background:BG, minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:12, fontFamily:'sans-serif' }}><div style={{ fontSize:40 }}>🍺</div><div style={{ color:SYR, fontSize:18, fontWeight:700 }}>Loading…</div></div>;
   if (tab === 'home') return <WelcomeDashboard onStart={()=>setTab('setup')} />;
 
-  const { phase, mode, players, teams, events } = gs;
+  const { phase = 'setup', mode = '2v2', players = [], teams = [], events = [] } = gs || {};
+  // Migrate old state if needed
+  useEffect(() => {
+    if (gs && (gs.mode === undefined || gs.players === undefined)) {
+      update(prev => ({ ...prev, mode: prev.mode || '2v2', players: prev.players || [] }));
+    }
+  }, [gs?.mode, gs?.players]);
   const assigned = teams.flatMap(t=>t.player2?[t.player1,t.player2]:[t.player1]);
   const standings = calcStandings(teams, events);
   const allDone = events.every(ev=>ev.bracket?.rounds?.[ev.bracket.rounds.length-1]?.[0]?.w);
