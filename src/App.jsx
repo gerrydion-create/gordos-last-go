@@ -18,7 +18,7 @@ const PHOTOS = [
 // ═══════════════════════════════════════════════════════════════════
 
 const BACHELOR_NAME = "WADER";
-const DEFAULT_PLAYERS = ['Wade','Ger','Lance','Regs','Ivo','Arny','Andy','Turner','Scotty B','Gibby','Patty','Jimmer'];
+const PLAYERS = ['Wade','Ger','Lance','Regs','Ivo','Arny','Andy','Turner','Scotty B','Gibby','Patty','Jimmer'];
 const EVENT_NAMES = ['Beer Pong','Flip Cup','Cornhole','Beer Ball','Rage Cage'];
 const EVENT_INFO = {
   'Beer Pong': { emoji: '🏓', desc: 'Sink ping pong balls into your opponents\' cups from across the table. Each team sets up 6 or 10 cups in a triangle. Take turns shooting — sink a ball, they drink. Last team with cups standing wins.' },
@@ -27,7 +27,7 @@ const EVENT_INFO = {
   'Beer Ball': { emoji: '🍺', desc: 'Two teams of 2, each player has an unopened beer on the table. Take turns throwing a ping pong ball at the other team\'s cans. Hit one? Start chugging your beer until they retrieve the ball and slam it on the table. First team to finish all their beers wins.' },
   'Rage Cage': { emoji: '😤', desc: 'Players circle a table of filled cups. Two players start with a ball each — bounce it into an empty cup. Make it? Pass cup and ball to the left. If you make it before the person to your right, stack your cup on theirs and they drink a new cup from the middle. Game ends when all cups are gone.' },
 };
-const TEAM_COLORS = ['#E53E3E','#3182CE','#38A169','#D69E2E','#9F7AEA','#DD6B20','#EC4899','#0EA5E9','#14B8A6','#84CC16','#F43F5E','#8B5CF6'];
+const TEAM_COLORS = ['#E53E3E','#3182CE','#38A169','#D69E2E','#9F7AEA','#DD6B20'];
 const PTS      = { 1:6, 2:5, 3:4, 4:3, 5:1.5 };
 const MEDALS   = { 1:'🥇', 2:'🥈', 3:'🥉', 4:'4th', 5:'T‑5th' };
 const PTS_LBL  = { 1:'6 pts', 2:'5 pts', 3:'4 pts', 4:'3 pts', 5:'1.5 pts' };
@@ -59,23 +59,31 @@ const shuffled = (arr) => {
   return a;
 };
 
-// Generate all brackets together with balanced byes
+// Generate all 5 brackets together so byes are balanced across teams.
+// 5 events x 2 byes = 10 bye slots for 6 teams -> 4 teams get 2 byes, 2 teams get 1 bye.
 const genBalancedBrackets = (ids, numEvents) => {
-  return Array.from({ length: numEvents }, () => mkBracket(shuffled(ids)));
+  const byeCounts = Object.fromEntries(ids.map(id => [id, 0]));
+  return Array.from({ length: numEvents }, () => {
+    const sorted = [...ids].sort((a, b) => {
+      const diff = byeCounts[a] - byeCounts[b];
+      return diff !== 0 ? diff : Math.random() - 0.5;
+    });
+    const byeTeams = sorted.slice(0, 2);
+    const r1Teams  = shuffled(sorted.slice(2));
+    byeTeams.forEach(id => byeCounts[id]++);
+    return mkBracket([...byeTeams, ...r1Teams]);
+  });
 };
 
-// Flexible bracket for 2-8 teams
-const mkBracket = (ids) => {
-  const n = ids.length;
-  if (n === 2) return { size:2, seeds:[...ids], FM: mkMatch(ids[0],ids[1]) };
-  if (n === 3) return { size:3, seeds:[...ids], SM: mkMatch(ids[1],ids[2]), FM: mkMatch(ids[0],null), TP: mkMatch(null,null) };
-  if (n === 4) return { size:4, seeds:[...ids], S1: mkMatch(ids[0],ids[3]), S2: mkMatch(ids[1],ids[2]), FM: mkMatch(null,null), TP: mkMatch(null,null) };
-  if (n === 5) return { size:5, seeds:[...ids], R1: mkMatch(ids[3],ids[4]), S1: mkMatch(ids[0],null), S2: mkMatch(ids[1],ids[2]), FM: mkMatch(null,null), TP: mkMatch(null,null) };
-  if (n === 6) return { size:6, seeds:[...ids], R1M1: mkMatch(ids[2],ids[5]), R1M2: mkMatch(ids[3],ids[4]), S1: mkMatch(ids[0],null), S2: mkMatch(ids[1],null), FM: mkMatch(null,null), TP: mkMatch(null,null) };
-  if (n === 7) return { size:7, seeds:[...ids], R1M1: mkMatch(ids[3],ids[6]), R1M2: mkMatch(ids[4],ids[5]), R1M3: mkMatch(ids[1],ids[2]), S1: mkMatch(ids[0],null), S2: mkMatch(null,null), FM: mkMatch(null,null), TP: mkMatch(null,null) };
-  // 8 teams
-  return { size:8, seeds:[...ids], Q1: mkMatch(ids[0],ids[7]), Q2: mkMatch(ids[3],ids[4]), Q3: mkMatch(ids[1],ids[6]), Q4: mkMatch(ids[2],ids[5]), S1: mkMatch(null,null), S2: mkMatch(null,null), FM: mkMatch(null,null), TP: mkMatch(null,null) };
-};
+const mkBracket = (ids) => ({
+  seeds: [...ids],
+  R1M1: mkMatch(ids[2], ids[5]),
+  R1M2: mkMatch(ids[3], ids[4]),
+  R2M1: mkMatch(ids[0], null),
+  R2M2: mkMatch(ids[1], null),
+  R3M1: mkMatch(null, null),
+  R3M2: mkMatch(null, null),
+});
 
 const getLoser = (m) =>
   (!m.w || !m.t1 || !m.t2) ? null : (m.w === m.t1 ? m.t2 : m.t1);
@@ -88,89 +96,36 @@ const recordGameWin = (bk, mid, teamId) => {
   if (teamId === m.t1) m.s1++; else m.s2++;
   if (m.s1 >= 2) m.w = m.t1;
   else if (m.s2 >= 2) m.w = m.t2;
-  if (!m.w) return b;
-  const win = m.w, lose = getLoser(m);
-
-  if (b.size === 2) { /* final is the only match */ }
-  else if (b.size === 3) {
-    if (mid==='SM') { b.FM.t2 = win; if(b.TP) b.TP.t1 = lose; }
-  }
-  else if (b.size === 4) {
-    if (mid==='S1') { b.FM.t1 = win; b.TP.t1 = lose; }
-    if (mid==='S2') { b.FM.t2 = win; b.TP.t2 = lose; }
-  }
-  else if (b.size === 5) {
-    if (mid==='R1') b.S1.t2 = win;
-    if (mid==='S1') { b.FM.t1 = win; b.TP.t1 = lose; }
-    if (mid==='S2') { b.FM.t2 = win; b.TP.t2 = lose; }
-  }
-  else if (b.size === 6) {
-    if (mid==='R1M1') b.S1.t2 = win;
-    if (mid==='R1M2') b.S2.t2 = win;
-    if (mid==='S1') { b.FM.t1 = win; b.TP.t1 = lose; }
-    if (mid==='S2') { b.FM.t2 = win; b.TP.t2 = lose; }
-  }
-  else if (b.size === 7) {
-    if (mid==='R1M1') b.S1.t2 = win;
-    if (mid==='R1M2') b.S2.t1 = win;
-    if (mid==='R1M3') b.S2.t2 = win;
-    if (mid==='S1') { b.FM.t1 = win; b.TP.t1 = lose; }
-    if (mid==='S2') { b.FM.t2 = win; b.TP.t2 = lose; }
-  }
-  else if (b.size === 8) {
-    if (mid==='Q1') b.S1.t1 = win;
-    if (mid==='Q2') b.S1.t2 = win;
-    if (mid==='Q3') b.S2.t1 = win;
-    if (mid==='Q4') b.S2.t2 = win;
-    if (mid==='S1') { b.FM.t1 = win; b.TP.t1 = lose; }
-    if (mid==='S2') { b.FM.t2 = win; b.TP.t2 = lose; }
+  if (m.w) {
+    const win = m.w;
+    if (mid === 'R1M1') b.R2M1.t2 = win;
+    if (mid === 'R1M2') b.R2M2.t2 = win;
+    if (mid === 'R2M1') { b.R3M2.t1 = win; b.R3M1.t1 = getLoser(m); }
+    if (mid === 'R2M2') { b.R3M2.t2 = win; b.R3M1.t2 = getLoser(m); }
   }
   return b;
 };
 
 const resetMatch = (bk, mid) => {
   const b = JSON.parse(JSON.stringify(bk));
-  b[mid] = { ...b[mid], s1:0, s2:0, w:null };
-  const clr = (key) => { if(b[key]) b[key] = { ...b[key], t1:null, t2:null, s1:0, s2:0, w:null }; };
-  const clrSlot = (key, slot) => { if(b[key]) { b[key][slot]=null; b[key].s1=0; b[key].s2=0; b[key].w=null; } };
-  // Clear everything downstream based on bracket size
-  if (mid==='FM' || mid==='TP') { /* no downstream */ }
-  else if (mid==='S1' || mid==='S2') { clr('FM'); clr('TP'); }
-  else if (mid.startsWith('R1') || mid==='R1') {
-    // Clear the semi this feeds into, then final+3rd
-    if (b.size===5 && mid==='R1') { clrSlot('S1','t2'); clr('FM'); clr('TP'); }
-    if (b.size===6) { if(mid==='R1M1') clrSlot('S1','t2'); if(mid==='R1M2') clrSlot('S2','t2'); clr('FM'); clr('TP'); }
-    if (b.size===7) { if(mid==='R1M1') clrSlot('S1','t2'); if(mid==='R1M2') clrSlot('S2','t1'); if(mid==='R1M3') clrSlot('S2','t2'); clr('FM'); clr('TP'); }
-  }
-  else if (mid.startsWith('Q')) { clr('S1'); clr('S2'); clr('FM'); clr('TP'); }
-  // Re-seed byes for size 3/5/6/7
-  if (b.size >= 3 && b.seeds) {
-    // Re-apply bye seeds that are fixed
-    if (b.size===3) { b.FM.t1 = b.seeds[0]; }
-    if (b.size===5) { b.S1.t1 = b.seeds[0]; }
-    if (b.size===6) { b.S1.t1 = b.seeds[0]; b.S2.t1 = b.seeds[1]; }
-    if (b.size===7) { b.S1.t1 = b.seeds[0]; }
-  }
-  // Re-propagate any already-decided upstream matches
-  const reApply = (src, tgt, slot) => { if(b[src]?.w) b[tgt][slot] = b[src].w; };
-  if (b.size===5) { reApply('R1','S1','t2'); reApply('S1','FM','t1'); reApply('S2','FM','t2'); }
-  if (b.size===6) { reApply('R1M1','S1','t2'); reApply('R1M2','S2','t2'); reApply('S1','FM','t1'); reApply('S2','FM','t2'); }
-  if (b.size===7) { reApply('R1M1','S1','t2'); reApply('R1M2','S2','t1'); reApply('R1M3','S2','t2'); reApply('S1','FM','t1'); reApply('S2','FM','t2'); }
-  if (b.size===8) { reApply('Q1','S1','t1'); reApply('Q2','S1','t2'); reApply('Q3','S2','t1'); reApply('Q4','S2','t2'); reApply('S1','FM','t1'); reApply('S2','FM','t2'); }
+  b[mid] = { ...b[mid], s1: 0, s2: 0, w: null };
+  const clr = (key, ct1, ct2) => {
+    b[key] = { ...b[key], t1: ct1 ? null : b[key].t1, t2: ct2 ? null : b[key].t2, s1: 0, s2: 0, w: null };
+  };
+  if (mid === 'R1M1') { clr('R2M1',false,true); clr('R3M2',true,false); clr('R3M1',true,false); }
+  if (mid === 'R1M2') { clr('R2M2',false,true); clr('R3M2',false,true); clr('R3M1',false,true); }
+  if (mid === 'R2M1') { clr('R3M2',true,false); clr('R3M1',true,false); }
+  if (mid === 'R2M2') { clr('R3M2',false,true); clr('R3M1',false,true); }
   return b;
 };
 
 const getPlacements = (bk) => {
   if (!bk) return {};
   const p = {};
-  if (bk.FM?.w) { p[bk.FM.w] = 1; const l = getLoser(bk.FM); if (l) p[l] = 2; }
-  if (bk.TP?.w) { p[bk.TP.w] = 3; const l = getLoser(bk.TP); if (l) p[l] = 4; }
-  // R1 losers = 5th
-  ['R1','R1M1','R1M2','R1M3','Q1','Q2','Q3','Q4'].forEach(k => {
-    if (bk[k]) { const l = getLoser(bk[k]); if (l && !(l in p)) p[l] = 5; }
-  });
-  // SM loser for 3-team (no 3rd place match winner yet)
-  if (bk.size===3 && bk.SM) { const l=getLoser(bk.SM); if(l&&!(l in p)) p[l]=3; }
+  if (bk.R3M2.w) { p[bk.R3M2.w] = 1; const l = getLoser(bk.R3M2); if (l) p[l] = 2; }
+  if (bk.R3M1.w) { p[bk.R3M1.w] = 3; const l = getLoser(bk.R3M1); if (l) p[l] = 4; }
+  const l1 = getLoser(bk.R1M1), l2 = getLoser(bk.R1M2);
+  if (l1) p[l1] = 5; if (l2) p[l2] = 5;
   return p;
 };
 
@@ -186,8 +141,6 @@ const calcStandings = (teams, events) => {
 
 const freshState = () => ({
   phase: 'setup',
-  mode: '2v2',
-  players: [...DEFAULT_PLAYERS],
   teams: [],
   events: EVENT_NAMES.map((name, i) => ({ id: i, name, bracket: null })),
 });
@@ -388,7 +341,7 @@ function MatchCard({ match, teams, onGameWin, onReset, label, accent }) {
       <div onClick={() => playable && id && onGameWin(id)} style={{ padding:'9px 11px', borderTop: idx===1?`1px solid ${BORDER}`:'none', borderLeft:`3px solid ${won?SYR:'transparent'}`, background: won?`${SYR}16`:'transparent', cursor: playable&&id?'pointer':'default', display:'flex', alignItems:'center', gap:7, opacity: lost?0.22:1, transition:'background .15s, opacity .15s', userSelect:'none', minHeight:38 }}>
         {team && <Dot ci={team.colorIdx} sz={7} />}
         <span style={{ fontSize:12, flex:1, fontWeight:won?700:400, color: team?(won?'#fff':'#ccc'):'#333', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-          {team ? (team.player2 ? `${team.player1} & ${team.player2}` : team.player1) : (id?'…TBD':'⏳ waiting')}
+          {team ? `${team.player1} & ${team.player2}` : (id?'…TBD':'⏳ waiting')}
         </span>
         {showScores && (
           <div style={{ display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
@@ -418,64 +371,37 @@ function MatchCard({ match, teams, onGameWin, onReset, label, accent }) {
 // ═══════════════════════════════════════════════════════════════════
 function BracketView({ bracket, teams, onGameWin, onResetMatch }) {
   if (!bracket) return null;
-  const n = bracket.size || 6;
-  const champion = bracket.FM?.w ? teams.find(t => t.id === bracket.FM.w) : null;
+  const champion = bracket.R3M2.w ? teams.find(t => t.id === bracket.R3M2.w) : null;
+  const seedOf = id => { if (!id||!bracket.seeds) return null; const i=bracket.seeds.indexOf(id); return i>=0?i+1:null; };
+  const lbl = (mid) => {
+    const s1=seedOf(bracket[mid].t1), s2=seedOf(bracket[mid].t2), sl=s=>s?`#${s}`:'?';
+    if (mid==='R1M1') return `${sl(s1)} vs ${sl(s2)} · Round 1`;
+    if (mid==='R1M2') return `${sl(s1)} vs ${sl(s2)} · Round 1`;
+    if (mid==='R2M1') return `${sl(s1)} BYE · Semi 1`;
+    if (mid==='R2M2') return `${sl(s1)} BYE · Semi 2`;
+    if (mid==='R3M1') return '🥉 3rd Place';
+    if (mid==='R3M2') return '🏆 Grand Final';
+    return mid;
+  };
   const Arrow = () => <div style={{ width:26, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', color:'#252525', fontSize:22, paddingTop:18 }}>›</div>;
   const CH = ({ txt }) => <div style={{ fontSize:10, fontWeight:700, letterSpacing:1, textTransform:'uppercase', color:'#3A3A3A', marginBottom:8, textAlign:'center' }}>{txt}</div>;
-  const MC = (mid, label, accent=false) => bracket[mid] ? <MatchCard match={bracket[mid]} teams={teams} onGameWin={id=>onGameWin(mid,id)} onReset={()=>onResetMatch(mid)} label={label} accent={accent} /> : null;
-
-  const teamLabel = (t) => t ? (t.player2 ? `${t.player1} & ${t.player2}` : t.player1) : '';
-
-  // Build columns based on bracket size
-  const cols = [];
-  if (n === 2) {
-    cols.push({ title:'Final', matches:[['FM','🏆 Final',true]] });
-  } else if (n === 3) {
-    cols.push({ title:'Semi', matches:[['SM','Semi']] });
-    cols.push({ title:'Final', matches:[['FM','🏆 Final',true],['TP','🥉 3rd Place']] });
-  } else if (n === 4) {
-    cols.push({ title:'Semifinals', matches:[['S1','Semi 1'],['S2','Semi 2']] });
-    cols.push({ title:'Finals', matches:[['FM','🏆 Final',true],['TP','🥉 3rd Place']] });
-  } else if (n === 5) {
-    cols.push({ title:'Play-in', matches:[['R1','Play-in']] });
-    cols.push({ title:'Semifinals', matches:[['S1','Semi 1'],['S2','Semi 2']] });
-    cols.push({ title:'Finals', matches:[['FM','🏆 Final',true],['TP','🥉 3rd Place']] });
-  } else if (n === 6) {
-    cols.push({ title:'Round 1', matches:[['R1M1','Round 1'],['R1M2','Round 1']] });
-    cols.push({ title:'Semifinals', matches:[['S1','Semi 1'],['S2','Semi 2']] });
-    cols.push({ title:'Finals', matches:[['FM','🏆 Final',true],['TP','🥉 3rd Place']] });
-  } else if (n === 7) {
-    cols.push({ title:'Round 1', matches:[['R1M1','R1'],['R1M2','R1'],['R1M3','R1']] });
-    cols.push({ title:'Semifinals', matches:[['S1','Semi 1'],['S2','Semi 2']] });
-    cols.push({ title:'Finals', matches:[['FM','🏆 Final',true],['TP','🥉 3rd Place']] });
-  } else {
-    cols.push({ title:'Quarterfinals', matches:[['Q1','QF 1'],['Q2','QF 2'],['Q3','QF 3'],['Q4','QF 4']] });
-    cols.push({ title:'Semifinals', matches:[['S1','Semi 1'],['S2','Semi 2']] });
-    cols.push({ title:'Finals', matches:[['FM','🏆 Final',true],['TP','🥉 3rd Place']] });
-  }
-
+  const MC = (mid, accent=false) => <MatchCard match={bracket[mid]} teams={teams} onGameWin={id=>onGameWin(mid,id)} onReset={()=>onResetMatch(mid)} label={lbl(mid)} accent={accent} />;
   return (
     <div>
       <div style={{ overflowX:'auto', paddingBottom:8 }}>
-        <div style={{ display:'flex', alignItems:'flex-start', paddingTop:4 }}>
-          {cols.map((col,ci)=>(
-            <div key={ci} style={{ display:'flex', alignItems:'flex-start' }}>
-              {ci>0&&<Arrow/>}
-              <div style={{ display:'flex', flexDirection:'column', alignItems:'center' }}>
-                <CH txt={col.title}/>
-                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                  {col.matches.map(([mid,label,accent])=>MC(mid,label,accent))}
-                </div>
-              </div>
-            </div>
-          ))}
+        <div style={{ display:'flex', alignItems:'flex-start', minWidth:780, paddingTop:4 }}>
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'center' }}><CH txt="Round 1"/><div style={{ display:'flex', flexDirection:'column', gap:10 }}>{MC('R1M1')}{MC('R1M2')}</div></div>
+          <Arrow/>
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'center' }}><CH txt="Semifinals"/><div style={{ display:'flex', flexDirection:'column', gap:10 }}>{MC('R2M1')}{MC('R2M2')}</div></div>
+          <Arrow/>
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'center' }}><CH txt="Finals"/><div style={{ display:'flex', flexDirection:'column', gap:10 }}>{MC('R3M2',true)}{MC('R3M1')}</div></div>
         </div>
       </div>
       {champion && (
         <div style={{ marginTop:20, padding:'16px 20px', textAlign:'center', background:`linear-gradient(135deg,#1A0D00,${SYR}2A)`, border:`2px solid ${SYR}`, borderRadius:12, boxShadow:`0 0 32px ${SYR}28` }}>
           <div style={{ fontSize:28 }}>🏆</div>
           <div style={{ color:SYR, fontWeight:900, fontSize:11, letterSpacing:2, marginTop:6, textTransform:'uppercase' }}>Event Winner</div>
-          <div style={{ color:'#fff', fontSize:20, fontWeight:800, marginTop:4 }}>{teamLabel(champion)}</div>
+          <div style={{ color:'#fff', fontSize:20, fontWeight:800, marginTop:4 }}>{champion.player1} & {champion.player2}</div>
         </div>
       )}
     </div>
@@ -494,7 +420,6 @@ export default function App() {
   const [askReset, setAskReset] = useState(false);
   const [newEvent, setNewEvent] = useState('');
   const [showAddEvent, setShowAddEvent] = useState(false);
-  const [newPlayer, setNewPlayer] = useState('');
 
   useEffect(() => {
     const lnk = document.createElement('link');
@@ -596,15 +521,15 @@ export default function App() {
     return <WelcomeDashboard onStart={() => setTab('setup')} />;
   }
 
-  const { phase='setup', teams=[], events=[], mode='2v2', players=[] } = gs || {};
-  const assigned  = teams.flatMap(t => t.player2 ? [t.player1, t.player2] : [t.player1]);
+  const { phase, teams, events } = gs;
+  const assigned  = teams.flatMap(t => [t.player1, t.player2]);
   const standings = calcStandings(teams, events);
-  const allDone   = events.every(ev => ev.bracket?.FM?.w);
+  const allDone   = events.every(ev => ev.bracket?.R3M2?.w);
 
   const tabs = [
     { id:'home', label:'Home', icon:'🏠' },
     { id:'setup', label:'Setup', icon:'⚙️' },
-    ...(phase==='tournament' ? events.map((ev,i)=>({ id:`e${i}`, label:ev.name, icon:ev.bracket?.FM?.w?'✓':`${i+1}`, done:!!ev.bracket?.FM?.w })) : []),
+    ...(phase==='tournament' ? events.map((ev,i)=>({ id:`e${i}`, label:ev.name, icon:ev.bracket?.R3M2?.w?'✓':`${i+1}`, done:!!ev.bracket?.R3M2?.w })) : []),
     ...(phase==='tournament' ? [{ id:'standings', label:'Standings', icon:'🏆' }] : []),
   ];
 
@@ -612,25 +537,20 @@ export default function App() {
 
   const handlePlayerClick = (p) => {
     if (assigned.includes(p)) return;
-    if (mode==='1v1') {
-      update(prev=>({ ...prev, teams:[...prev.teams, { id:`t${Date.now()}`, player1:p, player2:null, colorIdx:prev.teams.length }] }));
-      return;
-    }
     if (!selP) { setSelP(p); return; }
     if (selP===p) { setSelP(null); return; }
+    if (teams.length>=6) return;
     update(prev=>({ ...prev, teams:[...prev.teams, { id:`t${Date.now()}`, player1:selP, player2:p, colorIdx:prev.teams.length }] }));
     setSelP(null);
   };
   const removeTeam = (id) => update(prev=>({ ...prev, teams:prev.teams.filter(t=>t.id!==id) }));
-  const addPlayer = () => { const n=newPlayer.trim(); if(!n||(players||[]).includes(n)) return; update(prev=>({...prev, players:[...(prev.players||[]),n]})); setNewPlayer(''); };
-  const removePlayer = (p) => update(prev=>({...prev, players:(prev.players||[]).filter(x=>x!==p), teams:prev.teams.filter(t=>t.player1!==p&&t.player2!==p)}));
-  const toggleMode = () => { update(prev=>({...prev, mode:prev.mode==='2v2'?'1v1':'2v2', teams:[]})); setSelP(null); };
 
   const randomizeTeams = () => {
-    const sp = shuffled([...(players||[])]);
+    const shuffledPlayers = shuffled([...PLAYERS]);
     const newTeams = [];
-    if (mode==='2v2') { for(let i=0;i<sp.length-1;i+=2) newTeams.push({id:`t${Date.now()}${i}`,player1:sp[i],player2:sp[i+1],colorIdx:i/2}); }
-    else { sp.forEach((p,i)=>newTeams.push({id:`t${Date.now()}${i}`,player1:p,player2:null,colorIdx:i})); }
+    for (let i = 0; i < shuffledPlayers.length; i += 2) {
+      newTeams.push({ id:`t${Date.now()}${i}`, player1:shuffledPlayers[i], player2:shuffledPlayers[i+1], colorIdx:i/2 });
+    }
     update(prev=>({ ...prev, teams:newTeams }));
     setSelP(null);
   };
@@ -648,7 +568,7 @@ export default function App() {
   };
 
   const startTournament = () => {
-    if (teams.length<2) return;
+    if (teams.length!==6) return;
     if (events.length===0) return;
     const ids = teams.map(t=>t.id);
     const brackets = genBalancedBrackets(ids, events.length);
@@ -713,94 +633,93 @@ export default function App() {
         {tab==='setup' && (
           <div>
             <div style={{ marginBottom:24 }}>
-              <div style={{ ...FD, fontSize:34, fontWeight:900, lineHeight:1, background:`linear-gradient(135deg, #fff, ${SYR_LT})`, WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>Setup</div>
+              <div style={{ ...FD, fontSize:34, fontWeight:900, lineHeight:1, background:`linear-gradient(135deg, #fff, ${SYR_LT})`, WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>Team Setup</div>
               <div style={{ fontSize:14, color:'#777', marginTop:6 }}>
-                {phase==='tournament'?'Tournament is live — reset to change teams.':'Add players, pick a mode, and form teams.'}
+                {phase==='tournament'?'Tournament is live — reset to change teams.':'Tap two players to pair them into a team.'}
               </div>
             </div>
             {phase!=='tournament' && (
               <>
-                {/* MODE TOGGLE */}
-                <div style={{ display:'flex', gap:0, marginBottom:20, background:'#151515', borderRadius:12, border:`1px solid ${BORDER}`, overflow:'hidden' }}>
-                  {['2v2','1v1'].map(m=>(
-                    <button key={m} onClick={()=>{if(m!==mode)toggleMode();}} style={{...F, flex:1, padding:'14px', border:'none', background:mode===m?`${SYR}22`:'transparent', color:mode===m?SYR:'#555', fontWeight:700, fontSize:15, cursor:'pointer', borderBottom:`3px solid ${mode===m?SYR:'transparent'}`, WebkitTapHighlightColor:'transparent' }}>
-                      {m==='2v2'?'👥 Teams of 2':'👤 Solo (1v1)'}
-                    </button>
-                  ))}
-                </div>
-
-                {/* ADD PLAYERS */}
-                <div style={{ marginBottom:20 }}>
-                  <div style={{ fontSize:13, fontWeight:700, color:'#888', marginBottom:8, textTransform:'uppercase', letterSpacing:.5 }}>Players ({players.length})</div>
-                  <div style={{ display:'flex', gap:8, marginBottom:12 }}>
-                    <input value={newPlayer} onChange={e=>setNewPlayer(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addPlayer()} placeholder="Enter player name..." style={{...F, flex:1, padding:'14px 16px', borderRadius:12, background:CARD, border:`2px solid ${BORDER}`, color:'#fff', fontSize:15, outline:'none' }} />
-                    <button onClick={addPlayer} disabled={!newPlayer.trim()} style={{...F, background:newPlayer.trim()?SYR:'#222', border:'none', color:'#fff', padding:'14px 20px', borderRadius:12, cursor:newPlayer.trim()?'pointer':'not-allowed', fontSize:14, fontWeight:700 }}>Add</button>
-                  </div>
-                  {players.length>0&&(
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
-                      {players.map(p=>{
-                        const taken=assigned.includes(p);
-                        const myTeam=teams.find(t=>t.player1===p||t.player2===p);
-                        return (
-                          <div key={p} style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 12px', background:taken?`${TEAM_COLORS[myTeam?.colorIdx%TEAM_COLORS.length]}18`:CARD, border:`1px solid ${taken?TEAM_COLORS[myTeam?.colorIdx%TEAM_COLORS.length]+'44':BORDER}`, borderRadius:10 }}>
-                            <span style={{ fontSize:13, fontWeight:600, color:taken?'#666':'#ddd' }}>{p}</span>
-                            <button onClick={()=>removePlayer(p)} style={{ background:'none', border:'none', color:'#444', cursor:'pointer', fontSize:12, padding:0, lineHeight:1 }}>✕</button>
-                          </div>
-                        );
-                      })}
-                    </div>
+                {/* Randomize + Clear */}
+                <div style={{ display:'flex', gap:10, marginBottom:18, flexWrap:'wrap', alignItems:'center' }}>
+                  <button onClick={randomizeTeams} style={{
+                    ...F, background:`${SYR}18`, border:`2px solid ${SYR}44`, color:SYR,
+                    padding:'12px 20px', borderRadius:12, cursor:'pointer', fontSize:14, fontWeight:700,
+                    WebkitTapHighlightColor:'transparent', display:'flex', alignItems:'center', gap:8,
+                  }}>🎲 Randomize Teams</button>
+                  {teams.length > 0 && (
+                    <button onClick={()=>{update(prev=>({...prev, teams:[]}));setSelP(null);}} style={{
+                      ...F, background:'rgba(255,255,255,.04)', border:'1px solid #333', color:'#666',
+                      padding:'12px 16px', borderRadius:12, cursor:'pointer', fontSize:13, fontWeight:600,
+                      WebkitTapHighlightColor:'transparent',
+                    }}>Clear All</button>
                   )}
                 </div>
 
-                {/* TEAM FORMATION */}
-                {players.length>=2&&(
-                  <>
-                    <div style={{ display:'flex', gap:10, marginBottom:14, flexWrap:'wrap', alignItems:'center' }}>
-                      <button onClick={randomizeTeams} style={{...F, background:`${SYR}18`, border:`2px solid ${SYR}44`, color:SYR, padding:'12px 20px', borderRadius:12, cursor:'pointer', fontSize:14, fontWeight:700, WebkitTapHighlightColor:'transparent' }}>🎲 Randomize</button>
-                      {teams.length>0&&(<button onClick={()=>{update(prev=>({...prev, teams:[]}));setSelP(null);}} style={{...F, background:'rgba(255,255,255,.04)', border:'1px solid #333', color:'#666', padding:'12px 16px', borderRadius:12, cursor:'pointer', fontSize:13, fontWeight:600 }}>Clear All</button>)}
-                    </div>
-
-                    {mode==='2v2'&&selP&&<div style={{ padding:'14px 18px', marginBottom:14, background:`linear-gradient(135deg, ${SYR}22, ${SYR}10)`, border:`2px solid ${SYR}66`, borderRadius:12, color:SYR, fontSize:15, fontWeight:600, display:'flex', alignItems:'center', gap:8 }}>
-                      <div style={{ width:10, height:10, borderRadius:'50%', background:SYR, flexShrink:0 }} />
-                      <span><strong>{selP}</strong> — tap another player to pair</span>
-                    </div>}
-
-                    <div style={{ fontSize:12, fontWeight:600, color:'#555', marginBottom:8 }}>{mode==='2v2'?'Tap two players to pair them':'Tap a player to enter them'}</div>
-                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(120px,1fr))', gap:8, marginBottom:20 }}>
-                      {players.filter(p=>!assigned.includes(p)).map(p=>(
-                        <button key={p} onClick={()=>handlePlayerClick(p)} style={{...F, padding:'16px 10px', borderRadius:12, border:`2px solid ${selP===p?SYR:BORDER}`, background:selP===p?`${SYR}28`:CARD, color:selP===p?'#fff':'#ddd', cursor:'pointer', fontWeight:700, fontSize:14, boxShadow:selP===p?`0 0 20px ${SYR}44`:'none', WebkitTapHighlightColor:'transparent', minHeight:50 }}>
-                          {p}
-                          {selP===p&&<div style={{ fontSize:9, color:SYR, marginTop:3, letterSpacing:1, fontWeight:800 }}>SELECTED</div>}
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-
-                {/* TEAMS LIST */}
-                {teams.length>0&&(
-                  <div style={{ marginBottom:8 }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
-                      <span style={{ fontSize:14, fontWeight:700, color:'#888' }}>{mode==='1v1'?'Players':'Teams'} Entered</span>
-                      <span style={{ ...FD, fontSize:28, fontWeight:900, color:SYR }}>{teams.length}</span>
-                    </div>
-                  </div>
-                )}
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(180px,1fr))', gap:10, marginBottom:20 }}>
-                  {teams.map((t,i)=>(
-                    <div key={t.id} style={{ padding:'14px 16px', borderRadius:14, border:`2px solid ${TEAM_COLORS[t.colorIdx%TEAM_COLORS.length]}66`, background:`linear-gradient(135deg, ${TEAM_COLORS[t.colorIdx%TEAM_COLORS.length]}18, ${TEAM_COLORS[t.colorIdx%TEAM_COLORS.length]}08)`, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                      <div>
-                        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-                          <Dot ci={t.colorIdx} sz={12}/>
-                          <span style={{ fontSize:12, fontWeight:800, color:TEAM_COLORS[t.colorIdx%TEAM_COLORS.length], letterSpacing:.5, textTransform:'uppercase' }}>#{i+1}</span>
-                        </div>
-                        <div style={{ fontSize:15, fontWeight:700, color:'#fff' }}>{t.player2 ? `${t.player1} & ${t.player2}` : t.player1}</div>
-                      </div>
-                      <button onClick={()=>removeTeam(t.id)} style={{ background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', color:'#555', cursor:'pointer', fontSize:14, padding:'6px 10px', borderRadius:8 }}>✕</button>
-                    </div>
-                  ))}
+                {selP && <div style={{ padding:'14px 18px', marginBottom:18, background:`linear-gradient(135deg, ${SYR}22, ${SYR}10)`, border:`2px solid ${SYR}66`, borderRadius:12, color:SYR, fontSize:15, fontWeight:600, display:'flex', alignItems:'center', gap:8 }}>
+                  <div style={{ width:10, height:10, borderRadius:'50%', background:SYR, flexShrink:0 }} />
+                  <span><strong>{selP}</strong> selected — tap another player to form a team</span>
+                </div>}
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px,1fr))', gap:10, marginBottom:28 }}>
+                  {PLAYERS.map(p => {
+                    const taken=assigned.includes(p), isSel=selP===p, myTeam=teams.find(t=>t.player1===p||t.player2===p);
+                    return (
+                      <button key={p} onClick={()=>handlePlayerClick(p)} disabled={taken} style={{
+                        ...F, padding:'18px 10px', borderRadius:12,
+                        border: `2px solid ${isSel ? SYR : taken ? TEAM_COLORS[myTeam?.colorIdx]+'55' : BORDER}`,
+                        background: isSel ? `linear-gradient(135deg, ${SYR}35, ${SYR}18)` : taken ? `${TEAM_COLORS[myTeam?.colorIdx]}12` : CARD,
+                        color: taken ? '#555' : isSel ? '#fff' : '#ddd',
+                        cursor: taken ? 'not-allowed' : 'pointer',
+                        fontWeight:700, fontSize:15, transition:'all .15s', position:'relative',
+                        boxShadow: isSel ? `0 0 20px ${SYR}44` : 'none',
+                        WebkitTapHighlightColor:'transparent', minHeight:56,
+                      }}>
+                        {p}
+                        {taken && myTeam && <div style={{ width:10, height:10, borderRadius:'50%', background:TEAM_COLORS[myTeam.colorIdx], position:'absolute', top:7, right:7, boxShadow:`0 0 6px ${TEAM_COLORS[myTeam.colorIdx]}88` }} />}
+                        {isSel && <div style={{ fontSize:9, color:SYR, marginTop:4, letterSpacing:1, fontWeight:800 }}>SELECTED</div>}
+                        {taken && <div style={{ fontSize:9, color:'#444', marginTop:4, letterSpacing:.5, fontWeight:600 }}>PAIRED</div>}
+                      </button>
+                    );
+                  })}
                 </div>
-            {teams.length>=2&&phase!=='tournament'&&(
+              </>
+            )}
+
+            {/* Progress bar */}
+            <div style={{ marginBottom:8 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                <span style={{ fontSize:14, fontWeight:700, color:'#888' }}>Teams Formed</span>
+                <span style={{ ...FD, fontSize:28, fontWeight:900, color:SYR }}>{teams.length}<span style={{ color:'#444', fontSize:18 }}>/6</span></span>
+              </div>
+              <div style={{ height:6, background:'#1A1A1A', borderRadius:3, overflow:'hidden' }}>
+                <div style={{ height:'100%', width:`${(teams.length/6)*100}%`, background:`linear-gradient(90deg, ${SYR_DK}, ${SYR}, ${SYR_LT})`, borderRadius:3, transition:'width .3s', boxShadow: teams.length > 0 ? `0 0 10px ${SYR}66` : 'none' }} />
+              </div>
+            </div>
+
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px,1fr))', gap:10, marginBottom:28, marginTop:16 }}>
+              {teams.map((t,i)=>(
+                <div key={t.id} style={{
+                  padding:'16px 18px', borderRadius:14,
+                  border:`2px solid ${TEAM_COLORS[t.colorIdx]}66`,
+                  background:`linear-gradient(135deg, ${TEAM_COLORS[t.colorIdx]}18, ${TEAM_COLORS[t.colorIdx]}08)`,
+                  display:'flex', alignItems:'center', justifyContent:'space-between',
+                  boxShadow:`0 4px 16px ${TEAM_COLORS[t.colorIdx]}15`,
+                }}>
+                  <div>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                      <Dot ci={t.colorIdx} sz={12}/>
+                      <span style={{ fontSize:12, fontWeight:800, color:TEAM_COLORS[t.colorIdx], letterSpacing:.5, textTransform:'uppercase' }}>Team {i+1}</span>
+                    </div>
+                    <div style={{ fontSize:16, fontWeight:700, color:'#fff' }}>{t.player1} & {t.player2}</div>
+                  </div>
+                  {phase!=='tournament'&&<button onClick={()=>removeTeam(t.id)} style={{ background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', color:'#555', cursor:'pointer', fontSize:14, padding:'6px 10px', borderRadius:8, WebkitTapHighlightColor:'transparent' }}>✕</button>}
+                </div>
+              ))}
+              {phase!=='tournament'&&Array.from({length:6-teams.length}).map((_,i)=>(
+                <div key={`ph${i}`} style={{ padding:'16px 18px', borderRadius:14, border:`2px dashed #222`, display:'flex', alignItems:'center', justifyContent:'center', color:'#222', fontSize:14, fontWeight:600 }}>Team {teams.length+i+1}</div>
+              ))}
+            </div>
+            {teams.length===6&&phase!=='tournament'&&(
               <>
                 {/* EVENT EDITOR */}
                 <div style={{ marginBottom:24, marginTop:8 }}>
@@ -851,7 +770,7 @@ export default function App() {
                   boxShadow:`0 8px 32px ${SYR}66, 0 0 60px ${SYR}22`,
                   WebkitTapHighlightColor:'transparent',
                 }}>🍻 START BEER OLYMPICS!</button>
-                <div style={{ marginTop:10, fontSize:12, color:'#444' }}>{teams.length} {mode==='1v1'?'players':'teams'} · {events.length} events · Byes randomized per event</div>
+                <div style={{ marginTop:10, fontSize:12, color:'#444' }}>Byes are randomly assigned — different every event</div>
                 </div>
               </>
             )}
@@ -864,7 +783,7 @@ export default function App() {
             <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:4 }}>
               <span style={{ fontSize:28 }}>{EVENT_INFO[activeEvent.name]?.emoji}</span>
               <div style={{ ...FD, fontSize:28, fontWeight:900, color:'#fff' }}>{activeEvent.name}</div>
-              {activeEvent.bracket?.FM?.w&&<span style={{ background:'#0F2A0F', border:'1px solid #4CAF5055', color:'#4CAF50', fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:12, letterSpacing:.5 }}>COMPLETE ✓</span>}
+              {activeEvent.bracket?.R3M2?.w&&<span style={{ background:'#0F2A0F', border:'1px solid #4CAF5055', color:'#4CAF50', fontSize:10, fontWeight:700, padding:'3px 10px', borderRadius:12, letterSpacing:.5 }}>COMPLETE ✓</span>}
             </div>
 
             {/* How to play card */}
@@ -889,7 +808,7 @@ export default function App() {
                       <div key={t.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 14px', background:CARD, borderRadius:8, border:`1px solid ${place===1?SYR+'55':BORDER}` }}>
                         <span style={{ fontSize:15, width:44, textAlign:'center' }}>{MEDALS[place]}</span>
                         <Dot ci={t.colorIdx} sz={9}/>
-                        <span style={{ fontWeight:600, flex:1, fontSize:13.5 }}>{t.player2 ? `${t.player1} & ${t.player2}` : t.player1}</span>
+                        <span style={{ fontWeight:600, flex:1, fontSize:13.5 }}>{t.player1} & {t.player2}</span>
                         <span style={{ color:SYR, fontWeight:800, fontSize:13 }}>{PTS_LBL[place]}</span>
                       </div>
                     ))}
@@ -908,7 +827,7 @@ export default function App() {
               <div style={{ marginBottom:24, padding:'20px 24px', textAlign:'center', background:`linear-gradient(135deg,#1C0A00,${SYR}28)`, border:`2px solid ${SYR}`, borderRadius:14, boxShadow:`0 0 40px ${SYR}20` }}>
                 <div style={{ fontSize:36, lineHeight:1 }}>{allDone?'🎉':'👑'}</div>
                 <div style={{ ...FD, color:SYR, fontWeight:900, fontSize:13, letterSpacing:2, marginTop:8, textTransform:'uppercase' }}>{allDone?'🍺 Beer Olympics Champions 🍺':'Current Leader'}</div>
-                <div style={{ ...FD, color:'#fff', fontSize:26, fontWeight:900, marginTop:6 }}>{standings[0].player2 ? `${standings[0].player1} & ${standings[0].player2}` : standings[0].player1}</div>
+                <div style={{ ...FD, color:'#fff', fontSize:26, fontWeight:900, marginTop:6 }}>{standings[0].player1} & {standings[0].player2}</div>
                 <div style={{ color:'#999', fontSize:14, marginTop:4 }}>{standings[0].pts} points</div>
               </div>
             )}
@@ -917,7 +836,7 @@ export default function App() {
                 <div key={t.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'13px 16px', background:CARD, borderRadius:10, border:`1px solid ${i===0?SYR+'66':BORDER}`, boxShadow:i===0?`0 0 18px ${SYR}20`:'none' }}>
                   <div style={{ width:32,height:32,borderRadius:'50%',flexShrink:0,background:i===0?`linear-gradient(135deg,${SYR_DK},${SYR})`:i===1?'linear-gradient(135deg,#666,#aaa)':i===2?'linear-gradient(135deg,#7A5010,#CD7F32)':'#1E1E1E',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:13,color:'#fff' }}>{i+1}</div>
                   <Dot ci={t.colorIdx} sz={10}/>
-                  <span style={{ flex:1, fontWeight:600, fontSize:14 }}>{t.player2 ? `${t.player1} & ${t.player2}` : t.player1}</span>
+                  <span style={{ flex:1, fontWeight:600, fontSize:14 }}>{t.player1} & {t.player2}</span>
                   <div style={{ textAlign:'right' }}>
                     <div style={{ ...FD, fontWeight:900, fontSize:22, color:i===0?SYR:'#fff' }}>{t.pts}</div>
                     <div style={{ fontSize:10, color:'#555', lineHeight:1 }}>pts</div>
@@ -938,7 +857,7 @@ export default function App() {
                 <tbody>
                   {standings.map((t,i)=>(
                     <tr key={t.id} style={{ borderBottom:`1px solid ${BORDER}33`, background:i%2===0?'transparent':'#141414' }}>
-                      <td style={{ padding:'9px 14px', color:'#bbb' }}><div style={{ display:'flex', alignItems:'center', gap:7 }}><Dot ci={t.colorIdx} sz={7}/>{t.player2 ? `${t.player1} & ${t.player2}` : t.player1}</div></td>
+                      <td style={{ padding:'9px 14px', color:'#bbb' }}><div style={{ display:'flex', alignItems:'center', gap:7 }}><Dot ci={t.colorIdx} sz={7}/>{t.player1} & {t.player2}</div></td>
                       {events.map(ev=>{
                         const pl=getPlacements(ev.bracket), place=pl[t.id];
                         return <td key={ev.id} style={{ padding:'9px 12px', textAlign:'center' }}>{place!==undefined?<span style={{ color:place<=3?'#fff':'#666', fontWeight:place<=3?700:400 }}>{MEDALS[place]} <span style={{ color:SYR }}>{PTS[place]}</span></span>:<span style={{ color:'#252525' }}>—</span>}</td>;
