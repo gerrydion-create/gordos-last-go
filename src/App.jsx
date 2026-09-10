@@ -130,8 +130,28 @@ const mkBracket = (ids) => {
   return rebuild(b);
 };
 
-const genBalancedBrackets = (ids, numEvents) =>
-  Array.from({ length: numEvents }, () => mkBracket(shuffled(ids)));
+// Byes land on whoever is seeded 1..(draw - n), so we control who sits out by
+// choosing who goes at the front of the list. Across a whole tournament we hand
+// the byes to whoever has had the fewest so far, breaking ties at random — that
+// way nobody skips four first rounds while someone else plays every one.
+const genBalancedBrackets = (ids, numEvents) => {
+  const n = ids.length;
+  if (n < 2) return Array.from({ length: numEvents }, () => null);
+  let p = 2;
+  while (p < n) p *= 2;
+  const numByes = p - n;
+
+  const byeCount = {};
+  ids.forEach(id => { byeCount[id] = 0; });
+
+  return Array.from({ length: numEvents }, () => {
+    // shuffle first, then sort — sort is stable, so equal counts stay random
+    const order = shuffled(ids).sort((a, b) => byeCount[a] - byeCount[b]);
+    const byeTeams = order.slice(0, numByes);
+    byeTeams.forEach(id => { byeCount[id]++; });
+    return mkBracket([...shuffled(byeTeams), ...shuffled(order.slice(numByes))]);
+  });
+};
 
 const findMatch = (b, mid) => {
   if (mid === 'TP') return b.TP || null;
@@ -461,12 +481,15 @@ function BracketView({ bracket, teams, onGameWin, onResetMatch }) {
     return `Match ${i + 1}`;
   };
 
-  const cols = bracket.rounds.map((matches, r) => ({
-    title: roundTitle(r),
-    items: matches.map((m, i) => ({
+  const cols = bracket.rounds.map((matches, r) => {
+    const items = matches.map((m, i) => ({
       mid: `R${r}M${i}`, match: m, label: matchLabel(r, i), accent: r === R - 1,
-    })),
-  }));
+    }));
+    // Byes only ever happen in round 1. Drop them to the bottom of the column so
+    // the matches you actually have to play sit together at the top.
+    if (r === 0) items.sort((a, b) => (a.match.bye ? 1 : 0) - (b.match.bye ? 1 : 0));
+    return { title: roundTitle(r), items };
+  });
   if (bracket.TP && R >= 2)
     cols[R - 1].items.push({ mid:'TP', match: bracket.TP, label:'🥉 3rd Place', accent:false });
 
@@ -890,7 +913,7 @@ export default function App() {
                   boxShadow:`0 8px 32px ${SYR}66, 0 0 60px ${SYR}22`,
                   WebkitTapHighlightColor:'transparent',
                 }}>🍻 START BEER OLYMPICS!</button>
-                <div style={{ marginTop:10, fontSize:12, color:'#444' }}>{teams.length} {mode === '1v1' ? 'players' : 'teams'} · {events.length} events · Seeding reshuffled each event</div>
+                <div style={{ marginTop:10, fontSize:12, color:'#444' }}>{teams.length} {mode === '1v1' ? 'players' : 'teams'} · {events.length} events · Byes shared out evenly across events</div>
                 </div>
               </>
             )}
